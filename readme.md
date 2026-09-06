@@ -31,19 +31,24 @@ Run against any directory:
 python main.py <path_to_scan>
 ```
 
-Example — scan the current project:
-
-```bash
-python main.py .
-```
-
-Output lists each finding with its severity, rule ID, file, line number, and the offending code:
+By default, this prints a text report straight to the terminal:
 
 ```
 [HIGH] eval-use - .\example.py:12
     result = eval(user_input)
     Use of eval() is dangerous and should be avoided.
 ```
+
+### Exporting reports
+
+Use `--format` with `--output` to save a report as JSON or a standalone HTML page instead:
+
+```bash
+python main.py . --format json --output report.json
+python main.py . --format html --output report.html
+```
+
+The HTML report is self-contained (no external dependencies) and color-codes findings by severity — open it directly in a browser.
 
 ## Running the tests
 
@@ -58,29 +63,32 @@ Test fixtures live in `tests/fixtures/` and are excluded from pytest's own test 
 
 ## Known limitations
 
-Detection is currently **substring/regex-based**, not context-aware. This means:
+Detection uses Python's `ast` module, so it operates on parsed syntax rather than raw text. This means comments and docstrings can never trigger false positives (they aren't part of the AST at all), and string literals only match when they're genuinely being used — e.g. assigned to a variable or passed as an argument.
 
-- Comments or string literals that happen to contain a flagged pattern (e.g. a comment saying `# Rule to detect use of eval()`) can trigger false positives.
-- The scanner does not distinguish between a real `eval()` call and one appearing inside a string, docstring, or comment.
+That said, detection is still deliberately conservative in a few ways:
 
-This is a known and accepted limitation of the current version, documented rather than hidden — including in the test suite (`TestSecureCode` in `tests/test_scanner.py` explicitly records this behaviour).
+- `eval()` calls are flagged regardless of whether the input is provably harmless (e.g. `eval("1 + 2")`) — static analysis can't know intent, so any real call is treated as a risk.
+- SQL injection detection currently only catches **static** query strings matching known-risky patterns; it does not yet detect dynamically built queries (f-strings or string concatenation).
+- Secret detection matches against a fixed list of variable names in `rules.json` (e.g. `API_KEY`, `PASSWORD`) rather than inspecting value formats.
+
+These are documented tradeoffs, not oversights — see the Roadmap below for planned improvements.
 
 ## Roadmap
 
-- [ ] Move from substring matching to AST-based detection (using Python's `ast` module) to eliminate comment/string false positives
+- [x] Move from substring matching to AST-based detection (using Python's `ast` module) to eliminate comment/string false positives
+- [x] HTML/JSON report export
+- [ ] Detect dynamically constructed SQL queries (f-strings, string concatenation), not just static query strings
 - [ ] Expand `rules.json` with more patterns and severities
 - [ ] Optional local LLM-assisted analysis for more nuanced findings
-- [ ] HTML/JSON report export
 
 ## Project structure
 
 ```
 sentrylocal/
 ├── sentrylocal/
-│   ├── scanner.py      # Core scanning logic
-│   ├── rules.py         # Rule definitions
+│   ├── scanner.py      # Core scanning logic (AST-based detection)
 │   ├── rules.json        # Rule data (secrets, unsafe queries, insecure imports)
-│   └── report.py
+│   └── report.py         # Text/JSON/HTML report generation
 ├── tests/
 │   ├── fixtures/         # Sample vulnerable/clean code for testing
 │   └── test_scanner.py
