@@ -9,5 +9,8 @@
     "insecure_imports": [
         {"module": "subprocess", "reason": "Consider using subprocess.run instead."},
         {"module": "eval", "reason": "Avoid using eval for untrusted input."}
-    ]
+    ],
+    "pickle_loads": ["pickle.loads", "pickle.load"],
+    "subprocess_shell": ["shell=True"],
+    "weak_hash": ["md5", "sha1"]
 }

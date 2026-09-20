@@ -29,6 +29,21 @@ RULE_METADATA = {
         "severity": "MEDIUM",
         "description": "Insecure or risky module imported."
     },
+    "pickle_loads": {
+        "id": "pickle-loads",
+        "severity": "HIGH",
+        "description": "Deserialising untrusted data with pickle can execute arbitrary code."
+    },
+    "subprocess_shell": {
+        "id": "subprocess-shell",
+        "severity": "HIGH",
+        "description": "subprocess with shell=True is vulnerable to command injection."
+    },
+    "weak_hash": {
+        "id": "weak-hash",
+        "severity": "MEDIUM",
+        "description": "MD5/SHA1 are not suitable for security purposes. Use SHA-256 or better."
+    },
 }
 
 
@@ -83,6 +98,32 @@ class SecurityVisitor(ast.NodeVisitor):
                 and isinstance(node.func.value, ast.Name)
                 and node.func.value.id == "os"):
             self._add_finding(node.lineno, "os_system")
+
+        # pickle.loads(...) / pickle.load(...)
+        if (isinstance(node.func, ast.Attribute)
+                and node.func.attr in ("loads", "load")
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "pickle"):
+            self._add_finding(node.lineno, "pickle_loads")
+
+        # subprocess.run(...) / subprocess.call(...) with shell=True
+        if (isinstance(node.func, ast.Attribute)
+                and node.func.attr in ("run", "call", "Popen", "check_output", "check_call")
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "subprocess"):
+            for kw in node.keywords:
+                if (kw.arg == "shell"
+                        and isinstance(kw.value, ast.Constant)
+                        and kw.value.value is True):
+                    self._add_finding(node.lineno, "subprocess_shell")
+                    break
+
+        # hashlib.md5(...) / hashlib.sha1(...)
+        if (isinstance(node.func, ast.Attribute)
+                and node.func.attr in ("md5", "sha1")
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "hashlib"):
+            self._add_finding(node.lineno, "weak_hash")
 
         self.generic_visit(node)
 

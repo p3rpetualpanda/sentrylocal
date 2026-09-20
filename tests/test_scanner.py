@@ -97,6 +97,32 @@ class TestDynamicSQL:
         assert len(sql_findings) == 2
 
 
+class TestNewRules:
+    """test_new_rules.py — pickle, subprocess shell=True, and weak hashing
+    should be flagged; clean variants should not."""
+
+    def setup_method(self):
+        self.findings = get_findings("test_new_rules.py")
+        self.ids = rule_ids(self.findings)
+
+    def test_detects_pickle_loads(self):
+        assert "pickle-loads" in self.ids
+
+    def test_detects_subprocess_shell(self):
+        assert "subprocess-shell" in self.ids
+
+    def test_detects_weak_hash(self):
+        assert "weak-hash" in self.ids
+
+    def test_clean_subprocess_not_flagged(self):
+        shell_findings = [f for f in self.findings if f["rule"]["id"] == "subprocess-shell"]
+        assert len(shell_findings) == 1
+
+    def test_sha256_not_flagged(self):
+        hash_findings = [f for f in self.findings if f["rule"]["id"] == "weak-hash"]
+        assert len(hash_findings) == 1
+
+
 def test_scan_missing_file_returns_no_findings():
     """Scanning a file that doesn't exist should fail gracefully, not crash."""
     rules = load_rules()
