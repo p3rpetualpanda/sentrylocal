@@ -132,3 +132,23 @@ def test_scan_missing_file_returns_no_findings():
     rules = load_rules()
     findings = scan_file(os.path.join(FIXTURES_DIR, "does_not_exist.py"), rules)
     assert findings == []
+
+
+def test_sarif_output_is_valid_json():
+    """The SARIF report should be valid JSON with the expected structure."""
+    import json
+    from sentrylocal.report import generate_sarif_report
+
+    findings = get_findings("test_vulnerable_code.py")
+    sarif = json.loads(generate_sarif_report(findings))
+
+    assert sarif["version"] == "2.1.0"
+    assert sarif["$schema"].endswith("sarif-schema-2.1.0.json")
+    run = sarif["runs"][0]
+    assert run["tool"]["driver"]["name"] == "SentryLocal"
+    assert len(run["results"]) == len(findings)
+    # Every result must reference a rule id that exists in the driver's rule list.
+    rule_ids = {r["id"] for r in run["tool"]["driver"]["rules"]}
+    for result in run["results"]:
+        assert result["ruleId"] in rule_ids
+        assert result["locations"][0]["physicalLocation"]["region"]["startLine"] > 0

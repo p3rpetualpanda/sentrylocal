@@ -13,7 +13,7 @@ def main():
     parser.add_argument("directory", help="Directory to scan")
     parser.add_argument(
         "--format",
-        choices=["text", "json", "html"],
+        choices=["text", "json", "html", "sarif"],
         default="text",
         help="Report format (default: text, printed to terminal)"
     )
@@ -21,7 +21,7 @@ def main():
         "--output",
         metavar="FILE",
         help="Write the report to FILE instead of printing to the terminal. "
-             "Required for json/html formats."
+             "Required for json/html/sarif formats."
     )
     parser.add_argument(
         "--llm",

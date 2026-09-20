@@ -102,6 +102,74 @@ def generate_html_report(findings):
 </html>"""
 
 
+def generate_sarif_report(findings):
+    """Return a SARIF 2.1.0 report as a formatted JSON string.
+
+    SARIF (Static Analysis Results Interchange Format) is the standard
+    format for static analysis results, understood by GitHub, VS Code,
+    Azure DevOps, and many other tools.
+    """
+    level_map = {"HIGH": "error", "MEDIUM": "warning", "LOW": "note"}
+
+    # Build the rule list from the unique rules seen in the findings.
+    rules = []
+    seen = set()
+    for f in findings:
+        rule = f["rule"]
+        if rule["id"] not in seen:
+            seen.add(rule["id"])
+            cwe = rule.get("cwe")
+            rule_id = f"{rule['id']} ({cwe})" if cwe else rule["id"]
+            rules.append({
+                "id": rule_id,
+                "name": rule["id"],
+                "shortDescription": {"text": rule["description"]},
+                "defaultConfiguration": {"level": level_map.get(rule["severity"], "warning")},
+            })
+
+    results = []
+    for f in findings:
+        rule = f["rule"]
+        cwe = rule.get("cwe")
+        rule_id = f"{rule['id']} ({cwe})" if cwe else rule["id"]
+        message_text = rule["description"]
+        if "triage" in f:
+            t = f["triage"]
+            message_text += f" LLM triage: {t['verdict']} (confidence {t['confidence']:.0%}) — {t['explanation']}"
+        results.append({
+            "ruleId": rule_id,
+            "level": level_map.get(rule["severity"], "warning"),
+            "message": {"text": message_text},
+            "locations": [
+                {
+                    "physicalLocation": {
+                        "artifactLocation": {"uri": f["file"]},
+                        "region": {"startLine": f["line"]},
+                    }
+                }
+            ],
+        })
+
+    sarif = {
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "SentryLocal",
+                        "version": "2.0.0",
+                        "informationUri": "https://github.com/local/sentrylocal",
+                        "rules": rules,
+                    }
+                },
+                "results": results,
+            }
+        ],
+    }
+    return json.dumps(sarif, indent=2)
+
+
 def _escape(text):
     """Minimal HTML escaping for code snippets."""
     return (text.replace("&", "&amp;")
@@ -115,6 +183,7 @@ def write_report(findings, output_format, output_path):
         "text": generate_text_report,
         "json": generate_json_report,
         "html": generate_html_report,
+        "sarif": generate_sarif_report,
     }
 
     if output_format not in generators:

@@ -1,0 +1,365 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "SentryLocal",
+          "version": "2.0.0",
+          "informationUri": "https://github.com/local/sentrylocal",
+          "rules": [
+            {
+              "id": "sql-injection (CWE-89)",
+              "name": "sql-injection",
+              "shortDescription": {
+                "text": "Potential SQL injection vulnerability detected."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "insecure-import (CWE-248)",
+              "name": "insecure-import",
+              "shortDescription": {
+                "text": "Consider using subprocess.run instead."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "pickle-loads (CWE-502)",
+              "name": "pickle-loads",
+              "shortDescription": {
+                "text": "Deserialising untrusted data with pickle can execute arbitrary code."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "subprocess-shell (CWE-78)",
+              "name": "subprocess-shell",
+              "shortDescription": {
+                "text": "subprocess with shell=True is vulnerable to command injection."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "weak-hash (CWE-328)",
+              "name": "weak-hash",
+              "shortDescription": {
+                "text": "MD5/SHA1 are not suitable for security purposes. Use SHA-256 or better."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "eval-use (CWE-94)",
+              "name": "eval-use",
+              "shortDescription": {
+                "text": "Use of eval() is dangerous and should be avoided."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "os-system-use (CWE-78)",
+              "name": "os-system-use",
+              "shortDescription": {
+                "text": "Use of os.system() is dangerous and can lead to command injection."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "hardcoded-secret (CWE-798)",
+              "name": "hardcoded-secret",
+              "shortDescription": {
+                "text": "Hard-coded secret detected."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "sql-injection (CWE-89)",
+          "level": "error",
+          "message": {
+            "text": "Potential SQL injection vulnerability detected."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/fixtures\\test_dynamic_sql.py"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "sql-injection (CWE-89)",
+          "level": "error",
+          "message": {
+            "text": "Potential SQL injection vulnerability detected."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/fixtures\\test_dynamic_sql.py"
+                },
+                "region": {
+                  "startLine": 5
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "insecure-import (CWE-248)",
+          "level": "warning",
+          "message": {
+            "text": "Consider using subprocess.run instead."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/fixtures\\test_new_rules.py"
+                },
+                "region": {
+                  "startLine": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "pickle-loads (CWE-502)",
+          "level": "error",
+          "message": {
+            "text": "Deserialising untrusted data with pickle can execute arbitrary code."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/fixtures\\test_new_rules.py"
+                },
+                "region": {
+                  "startLine": 6
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "subprocess-shell (CWE-78)",
+          "level": "error",
+          "message": {
+            "text": "subprocess with shell=True is vulnerable to command injection."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/fixtures\\test_new_rules.py"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "weak-hash (CWE-328)",
+          "level": "warning",
+          "message": {
+            "text": "MD5/SHA1 are not suitable for security purposes. Use SHA-256 or better."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/fixtures\\test_new_rules.py"
+                },
+                "region": {
+                  "startLine": 12
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "insecure-import (CWE-248)",
+          "level": "warning",
+          "message": {
+            "text": "Consider using subprocess.run instead."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/fixtures\\test_secure_code.py"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "eval-use (CWE-94)",
+          "level": "error",
+          "message": {
+            "text": "Use of eval() is dangerous and should be avoided."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/fixtures\\test_secure_code.py"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "os-system-use (CWE-78)",
+          "level": "warning",
+          "message": {
+            "text": "Use of os.system() is dangerous and can lead to command injection."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/fixtures\\test_secure_code.py"
+                },
+                "region": {
+                  "startLine": 12
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "eval-use (CWE-94)",
+          "level": "error",
+          "message": {
+            "text": "Use of eval() is dangerous and should be avoided."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/fixtures\\test_vulnerable.py"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "eval-use (CWE-94)",
+          "level": "error",
+          "message": {
+            "text": "Use of eval() is dangerous and should be avoided."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/fixtures\\test_vulnerable_code.py"
+                },
+                "region": {
+                  "startLine": 4
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "hardcoded-secret (CWE-798)",
+          "level": "error",
+          "message": {
+            "text": "Hard-coded secret detected."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/fixtures\\test_vulnerable_code.py"
+                },
+                "region": {
+                  "startLine": 7
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "sql-injection (CWE-89)",
+          "level": "error",
+          "message": {
+            "text": "Potential SQL injection vulnerability detected."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/fixtures\\test_vulnerable_code.py"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "os-system-use (CWE-78)",
+          "level": "warning",
+          "message": {
+            "text": "Use of os.system() is dangerous and can lead to command injection."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "tests/fixtures\\test_vulnerable_code.py"
+                },
+                "region": {
+                  "startLine": 13
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
