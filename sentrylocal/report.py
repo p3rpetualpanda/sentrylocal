@@ -14,7 +14,11 @@ def generate_text_report(findings):
         cwe = f" ({rule['cwe']})" if rule.get("cwe") else ""
         lines.append(f"[{rule['severity']}] {rule['id']}{cwe} - {f['file']}:{f['line']}")
         lines.append(f"    {f['code']}")
-        lines.append(f"    {rule['description']}\n")
+        lines.append(f"    {rule['description']}")
+        if "triage" in f:
+            t = f["triage"]
+            lines.append(f"    LLM: {t['verdict']} (confidence {t['confidence']:.0%}) — {t['explanation']}")
+        lines.append("")
 
     return "\n".join(lines)
 
@@ -37,11 +41,25 @@ def generate_html_report(findings):
         "LOW": "#fbc02d",
     }
 
+    triage_colors = {
+        "true_positive": "#43a047",
+        "false_positive": "#9e9e9e",
+        "needs_review": "#ffb300",
+    }
+
     rows = []
     for f in findings:
         rule = f["rule"]
         color = severity_colors.get(rule["severity"], "#666")
         cwe = rule.get("cwe", "")
+        if "triage" in f:
+            t = f["triage"]
+            tcolor = triage_colors.get(t.get("verdict"), "#9e9e9e")
+            triage_cell = (f"<span style=\"color:{tcolor}; font-weight:bold;\">"
+                           f"{t.get('verdict', '')}</span> "
+                           f"<span style=\"color:#888;\">({_escape(t.get('explanation', ''))})</span>")
+        else:
+            triage_cell = "<span style=\"color:#666;\">—</span>"
         rows.append(f"""
         <tr>
             <td><span style="color:{color}; font-weight:bold;">{rule['severity']}</span></td>
@@ -51,9 +69,10 @@ def generate_html_report(findings):
             <td>{f['line']}</td>
             <td><code>{_escape(f['code'])}</code></td>
             <td>{rule['description']}</td>
+            <td>{triage_cell}</td>
         </tr>""")
 
-    rows_html = "".join(rows) if rows else "<tr><td colspan='7'>No issues found.</td></tr>"
+    rows_html = "".join(rows) if rows else "<tr><td colspan='8'>No issues found.</td></tr>"
 
     return f"""<!DOCTYPE html>
 <html>
@@ -75,7 +94,7 @@ def generate_html_report(findings):
     <p class="summary">Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} &mdash; {len(findings)} issue(s) found</p>
     <table>
         <thead>
-            <tr><th>Severity</th><th>Rule</th><th>CWE</th><th>File</th><th>Line</th><th>Code</th><th>Description</th></tr>
+            <tr><th>Severity</th><th>Rule</th><th>CWE</th><th>File</th><th>Line</th><th>Code</th><th>Description</th><th>Triage</th></tr>
         </thead>
         <tbody>{rows_html}</tbody>
     </table>
