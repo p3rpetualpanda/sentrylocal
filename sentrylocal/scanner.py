@@ -7,42 +7,50 @@ RULE_METADATA = {
     "eval": {
         "id": "eval-use",
         "severity": "HIGH",
-        "description": "Use of eval() is dangerous and should be avoided."
+        "description": "Use of eval() is dangerous and should be avoided.",
+        "cwe": "CWE-94"
     },
     "secrets": {
         "id": "hardcoded-secret",
         "severity": "HIGH",
-        "description": "Hard-coded secret detected."
+        "description": "Hard-coded secret detected.",
+        "cwe": "CWE-798"
     },
     "unsafe_queries": {
         "id": "sql-injection",
         "severity": "HIGH",
-        "description": "Potential SQL injection vulnerability detected."
+        "description": "Potential SQL injection vulnerability detected.",
+        "cwe": "CWE-89"
     },
     "os_system": {
         "id": "os-system-use",
         "severity": "MEDIUM",
-        "description": "Use of os.system() is dangerous and can lead to command injection."
+        "description": "Use of os.system() is dangerous and can lead to command injection.",
+        "cwe": "CWE-78"
     },
     "insecure_imports": {
         "id": "insecure-import",
         "severity": "MEDIUM",
-        "description": "Insecure or risky module imported."
+        "description": "Insecure or risky module imported.",
+        "cwe": "CWE-248"
     },
     "pickle_loads": {
         "id": "pickle-loads",
         "severity": "HIGH",
-        "description": "Deserialising untrusted data with pickle can execute arbitrary code."
+        "description": "Deserialising untrusted data with pickle can execute arbitrary code.",
+        "cwe": "CWE-502"
     },
     "subprocess_shell": {
         "id": "subprocess-shell",
         "severity": "HIGH",
-        "description": "subprocess with shell=True is vulnerable to command injection."
+        "description": "subprocess with shell=True is vulnerable to command injection.",
+        "cwe": "CWE-78"
     },
     "weak_hash": {
         "id": "weak-hash",
         "severity": "MEDIUM",
-        "description": "MD5/SHA1 are not suitable for security purposes. Use SHA-256 or better."
+        "description": "MD5/SHA1 are not suitable for security purposes. Use SHA-256 or better.",
+        "cwe": "CWE-328"
     },
 }
 

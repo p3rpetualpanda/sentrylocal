@@ -50,6 +50,10 @@ class TestVulnerableCode:
             assert "severity" in finding["rule"]
             assert "description" in finding["rule"]
 
+    def test_findings_have_cwe(self):
+        for finding in self.findings:
+            assert "cwe" in finding["rule"]
+
 
 class TestVulnerable:
     """test_vulnerable.py — simpler fixture, just eval() on user input."""

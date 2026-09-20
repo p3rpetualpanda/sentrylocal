@@ -11,7 +11,8 @@ def generate_text_report(findings):
     lines = [f"Found {len(findings)} issue(s):\n"]
     for f in findings:
         rule = f["rule"]
-        lines.append(f"[{rule['severity']}] {rule['id']} - {f['file']}:{f['line']}")
+        cwe = f" ({rule['cwe']})" if rule.get("cwe") else ""
+        lines.append(f"[{rule['severity']}] {rule['id']}{cwe} - {f['file']}:{f['line']}")
         lines.append(f"    {f['code']}")
         lines.append(f"    {rule['description']}\n")
 
@@ -40,17 +41,19 @@ def generate_html_report(findings):
     for f in findings:
         rule = f["rule"]
         color = severity_colors.get(rule["severity"], "#666")
+        cwe = rule.get("cwe", "")
         rows.append(f"""
         <tr>
             <td><span style="color:{color}; font-weight:bold;">{rule['severity']}</span></td>
             <td>{rule['id']}</td>
+            <td>{cwe}</td>
             <td>{f['file']}</td>
             <td>{f['line']}</td>
             <td><code>{_escape(f['code'])}</code></td>
             <td>{rule['description']}</td>
         </tr>""")
 
-    rows_html = "".join(rows) if rows else "<tr><td colspan='6'>No issues found.</td></tr>"
+    rows_html = "".join(rows) if rows else "<tr><td colspan='7'>No issues found.</td></tr>"
 
     return f"""<!DOCTYPE html>
 <html>
@@ -72,7 +75,7 @@ def generate_html_report(findings):
     <p class="summary">Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} &mdash; {len(findings)} issue(s) found</p>
     <table>
         <thead>
-            <tr><th>Severity</th><th>Rule</th><th>File</th><th>Line</th><th>Code</th><th>Description</th></tr>
+            <tr><th>Severity</th><th>Rule</th><th>CWE</th><th>File</th><th>Line</th><th>Code</th><th>Description</th></tr>
         </thead>
         <tbody>{rows_html}</tbody>
     </table>
