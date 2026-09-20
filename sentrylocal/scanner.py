@@ -7,27 +7,50 @@ RULE_METADATA = {
     "eval": {
         "id": "eval-use",
         "severity": "HIGH",
-        "description": "Use of eval() is dangerous and should be avoided."
+        "description": "Use of eval() is dangerous and should be avoided.",
+        "cwe": "CWE-94"
     },
     "secrets": {
         "id": "hardcoded-secret",
         "severity": "HIGH",
-        "description": "Hard-coded secret detected."
+        "description": "Hard-coded secret detected.",
+        "cwe": "CWE-798"
     },
     "unsafe_queries": {
         "id": "sql-injection",
         "severity": "HIGH",
-        "description": "Potential SQL injection vulnerability detected."
+        "description": "Potential SQL injection vulnerability detected.",
+        "cwe": "CWE-89"
     },
     "os_system": {
         "id": "os-system-use",
         "severity": "MEDIUM",
-        "description": "Use of os.system() is dangerous and can lead to command injection."
+        "description": "Use of os.system() is dangerous and can lead to command injection.",
+        "cwe": "CWE-78"
     },
     "insecure_imports": {
         "id": "insecure-import",
         "severity": "MEDIUM",
-        "description": "Insecure or risky module imported."
+        "description": "Insecure or risky module imported.",
+        "cwe": "CWE-248"
+    },
+    "pickle_loads": {
+        "id": "pickle-loads",
+        "severity": "HIGH",
+        "description": "Deserialising untrusted data with pickle can execute arbitrary code.",
+        "cwe": "CWE-502"
+    },
+    "subprocess_shell": {
+        "id": "subprocess-shell",
+        "severity": "HIGH",
+        "description": "subprocess with shell=True is vulnerable to command injection.",
+        "cwe": "CWE-78"
+    },
+    "weak_hash": {
+        "id": "weak-hash",
+        "severity": "MEDIUM",
+        "description": "MD5/SHA1 are not suitable for security purposes. Use SHA-256 or better.",
+        "cwe": "CWE-328"
     },
 }
 
@@ -84,6 +107,32 @@ class SecurityVisitor(ast.NodeVisitor):
                 and node.func.value.id == "os"):
             self._add_finding(node.lineno, "os_system")
 
+        # pickle.loads(...) / pickle.load(...)
+        if (isinstance(node.func, ast.Attribute)
+                and node.func.attr in ("loads", "load")
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "pickle"):
+            self._add_finding(node.lineno, "pickle_loads")
+
+        # subprocess.run(...) / subprocess.call(...) with shell=True
+        if (isinstance(node.func, ast.Attribute)
+                and node.func.attr in ("run", "call", "Popen", "check_output", "check_call")
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "subprocess"):
+            for kw in node.keywords:
+                if (kw.arg == "shell"
+                        and isinstance(kw.value, ast.Constant)
+                        and kw.value.value is True):
+                    self._add_finding(node.lineno, "subprocess_shell")
+                    break
+
+        # hashlib.md5(...) / hashlib.sha1(...)
+        if (isinstance(node.func, ast.Attribute)
+                and node.func.attr in ("md5", "sha1")
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "hashlib"):
+            self._add_finding(node.lineno, "weak_hash")
+
         self.generic_visit(node)
 
     def visit_Import(self, node):
@@ -122,7 +171,53 @@ class SecurityVisitor(ast.NodeVisitor):
                 if query_pattern in value and "?" not in value:
                     self._add_finding(node.lineno, "unsafe_queries")
 
+        # Dynamically constructed SQL: f-strings and string concatenation
+        self._check_fstring_sql(node)
+        self._check_concat_sql(node)
+
         self.generic_visit(node)
+
+    def _check_fstring_sql(self, node):
+        """Flag f-string SQL queries that interpolate values (injection vector)."""
+        if not isinstance(node.value, ast.JoinedStr):
+            return
+        literal_parts = []
+        has_interpolation = False
+        for value in node.value.values:
+            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                literal_parts.append(value.value)
+            elif isinstance(value, ast.FormattedValue):
+                has_interpolation = True
+        literal = "".join(literal_parts)
+        for pattern in self.rules.get("unsafe_queries", []):
+            if pattern in literal and has_interpolation:
+                self._add_finding(node.lineno, "unsafe_queries")
+                return
+
+    def _extract_concat_strings(self, node, parts):
+        """Recursively collect string constants from a + concatenation chain."""
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            parts.append(node.value)
+            return True
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+            left_is_str = self._extract_concat_strings(node.left, parts)
+            right_is_str = self._extract_concat_strings(node.right, parts)
+            return left_is_str and right_is_str
+        return False
+
+    def _check_concat_sql(self, node):
+        """Flag "..." + var style SQL construction (at least one non-constant operand)."""
+        if not (isinstance(node.value, ast.BinOp) and isinstance(node.value.op, ast.Add)):
+            return
+        parts = []
+        all_strings = self._extract_concat_strings(node.value, parts)
+        if not all_strings:
+            # At least one operand is a variable/call — that's the injection vector.
+            literal = "".join(parts)
+            for pattern in self.rules.get("unsafe_queries", []):
+                if pattern in literal:
+                    self._add_finding(node.lineno, "unsafe_queries")
+                    return
 
 
 def scan_file(filepath, rules):

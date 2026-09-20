@@ -50,6 +50,10 @@ class TestVulnerableCode:
             assert "severity" in finding["rule"]
             assert "description" in finding["rule"]
 
+    def test_findings_have_cwe(self):
+        for finding in self.findings:
+            assert "cwe" in finding["rule"]
+
 
 class TestVulnerable:
     """test_vulnerable.py — simpler fixture, just eval() on user input."""
@@ -81,8 +85,70 @@ class TestSecureCode:
         assert "eval-use" in ids
 
 
+class TestDynamicSQL:
+    """test_dynamic_sql.py — f-strings and concatenation should be flagged,
+    parameterised queries should not."""
+
+    def test_flags_fstring_sql(self):
+        ids = rule_ids(get_findings("test_dynamic_sql.py"))
+        assert "sql-injection" in ids
+
+    def test_parameterised_query_not_flagged(self):
+        # query3 uses "?" so it should not appear as a finding
+        findings = get_findings("test_dynamic_sql.py")
+        sql_findings = [f for f in findings if f["rule"]["id"] == "sql-injection"]
+        # only the f-string and concatenation lines should be flagged, not the "?" one
+        assert len(sql_findings) == 2
+
+
+class TestNewRules:
+    """test_new_rules.py — pickle, subprocess shell=True, and weak hashing
+    should be flagged; clean variants should not."""
+
+    def setup_method(self):
+        self.findings = get_findings("test_new_rules.py")
+        self.ids = rule_ids(self.findings)
+
+    def test_detects_pickle_loads(self):
+        assert "pickle-loads" in self.ids
+
+    def test_detects_subprocess_shell(self):
+        assert "subprocess-shell" in self.ids
+
+    def test_detects_weak_hash(self):
+        assert "weak-hash" in self.ids
+
+    def test_clean_subprocess_not_flagged(self):
+        shell_findings = [f for f in self.findings if f["rule"]["id"] == "subprocess-shell"]
+        assert len(shell_findings) == 1
+
+    def test_sha256_not_flagged(self):
+        hash_findings = [f for f in self.findings if f["rule"]["id"] == "weak-hash"]
+        assert len(hash_findings) == 1
+
+
 def test_scan_missing_file_returns_no_findings():
     """Scanning a file that doesn't exist should fail gracefully, not crash."""
     rules = load_rules()
     findings = scan_file(os.path.join(FIXTURES_DIR, "does_not_exist.py"), rules)
     assert findings == []
+
+
+def test_sarif_output_is_valid_json():
+    """The SARIF report should be valid JSON with the expected structure."""
+    import json
+    from sentrylocal.report import generate_sarif_report
+
+    findings = get_findings("test_vulnerable_code.py")
+    sarif = json.loads(generate_sarif_report(findings))
+
+    assert sarif["version"] == "2.1.0"
+    assert sarif["$schema"].endswith("sarif-schema-2.1.0.json")
+    run = sarif["runs"][0]
+    assert run["tool"]["driver"]["name"] == "SentryLocal"
+    assert len(run["results"]) == len(findings)
+    # Every result must reference a rule id that exists in the driver's rule list.
+    rule_ids = {r["id"] for r in run["tool"]["driver"]["rules"]}
+    for result in run["results"]:
+        assert result["ruleId"] in rule_ids
+        assert result["locations"][0]["physicalLocation"]["region"]["startLine"] > 0

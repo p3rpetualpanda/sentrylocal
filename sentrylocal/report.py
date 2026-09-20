@@ -11,9 +11,14 @@ def generate_text_report(findings):
     lines = [f"Found {len(findings)} issue(s):\n"]
     for f in findings:
         rule = f["rule"]
-        lines.append(f"[{rule['severity']}] {rule['id']} - {f['file']}:{f['line']}")
+        cwe = f" ({rule['cwe']})" if rule.get("cwe") else ""
+        lines.append(f"[{rule['severity']}] {rule['id']}{cwe} - {f['file']}:{f['line']}")
         lines.append(f"    {f['code']}")
-        lines.append(f"    {rule['description']}\n")
+        lines.append(f"    {rule['description']}")
+        if "triage" in f:
+            t = f["triage"]
+            lines.append(f"    LLM: {t['verdict']} (confidence {t['confidence']:.0%}) — {t['explanation']}")
+        lines.append("")
 
     return "\n".join(lines)
 
@@ -36,21 +41,38 @@ def generate_html_report(findings):
         "LOW": "#fbc02d",
     }
 
+    triage_colors = {
+        "true_positive": "#43a047",
+        "false_positive": "#9e9e9e",
+        "needs_review": "#ffb300",
+    }
+
     rows = []
     for f in findings:
         rule = f["rule"]
         color = severity_colors.get(rule["severity"], "#666")
+        cwe = rule.get("cwe", "")
+        if "triage" in f:
+            t = f["triage"]
+            tcolor = triage_colors.get(t.get("verdict"), "#9e9e9e")
+            triage_cell = (f"<span style=\"color:{tcolor}; font-weight:bold;\">"
+                           f"{t.get('verdict', '')}</span> "
+                           f"<span style=\"color:#888;\">({_escape(t.get('explanation', ''))})</span>")
+        else:
+            triage_cell = "<span style=\"color:#666;\">—</span>"
         rows.append(f"""
         <tr>
             <td><span style="color:{color}; font-weight:bold;">{rule['severity']}</span></td>
             <td>{rule['id']}</td>
+            <td>{cwe}</td>
             <td>{f['file']}</td>
             <td>{f['line']}</td>
             <td><code>{_escape(f['code'])}</code></td>
             <td>{rule['description']}</td>
+            <td>{triage_cell}</td>
         </tr>""")
 
-    rows_html = "".join(rows) if rows else "<tr><td colspan='6'>No issues found.</td></tr>"
+    rows_html = "".join(rows) if rows else "<tr><td colspan='8'>No issues found.</td></tr>"
 
     return f"""<!DOCTYPE html>
 <html>
@@ -72,12 +94,80 @@ def generate_html_report(findings):
     <p class="summary">Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} &mdash; {len(findings)} issue(s) found</p>
     <table>
         <thead>
-            <tr><th>Severity</th><th>Rule</th><th>File</th><th>Line</th><th>Code</th><th>Description</th></tr>
+            <tr><th>Severity</th><th>Rule</th><th>CWE</th><th>File</th><th>Line</th><th>Code</th><th>Description</th><th>Triage</th></tr>
         </thead>
         <tbody>{rows_html}</tbody>
     </table>
 </body>
 </html>"""
+
+
+def generate_sarif_report(findings):
+    """Return a SARIF 2.1.0 report as a formatted JSON string.
+
+    SARIF (Static Analysis Results Interchange Format) is the standard
+    format for static analysis results, understood by GitHub, VS Code,
+    Azure DevOps, and many other tools.
+    """
+    level_map = {"HIGH": "error", "MEDIUM": "warning", "LOW": "note"}
+
+    # Build the rule list from the unique rules seen in the findings.
+    rules = []
+    seen = set()
+    for f in findings:
+        rule = f["rule"]
+        if rule["id"] not in seen:
+            seen.add(rule["id"])
+            cwe = rule.get("cwe")
+            rule_id = f"{rule['id']} ({cwe})" if cwe else rule["id"]
+            rules.append({
+                "id": rule_id,
+                "name": rule["id"],
+                "shortDescription": {"text": rule["description"]},
+                "defaultConfiguration": {"level": level_map.get(rule["severity"], "warning")},
+            })
+
+    results = []
+    for f in findings:
+        rule = f["rule"]
+        cwe = rule.get("cwe")
+        rule_id = f"{rule['id']} ({cwe})" if cwe else rule["id"]
+        message_text = rule["description"]
+        if "triage" in f:
+            t = f["triage"]
+            message_text += f" LLM triage: {t['verdict']} (confidence {t['confidence']:.0%}) — {t['explanation']}"
+        results.append({
+            "ruleId": rule_id,
+            "level": level_map.get(rule["severity"], "warning"),
+            "message": {"text": message_text},
+            "locations": [
+                {
+                    "physicalLocation": {
+                        "artifactLocation": {"uri": f["file"]},
+                        "region": {"startLine": f["line"]},
+                    }
+                }
+            ],
+        })
+
+    sarif = {
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "SentryLocal",
+                        "version": "2.0.0",
+                        "informationUri": "https://github.com/local/sentrylocal",
+                        "rules": rules,
+                    }
+                },
+                "results": results,
+            }
+        ],
+    }
+    return json.dumps(sarif, indent=2)
 
 
 def _escape(text):
@@ -93,6 +183,7 @@ def write_report(findings, output_format, output_path):
         "text": generate_text_report,
         "json": generate_json_report,
         "html": generate_html_report,
+        "sarif": generate_sarif_report,
     }
 
     if output_format not in generators:
