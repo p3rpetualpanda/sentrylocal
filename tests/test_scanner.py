@@ -81,6 +81,22 @@ class TestSecureCode:
         assert "eval-use" in ids
 
 
+class TestDynamicSQL:
+    """test_dynamic_sql.py — f-strings and concatenation should be flagged,
+    parameterised queries should not."""
+
+    def test_flags_fstring_sql(self):
+        ids = rule_ids(get_findings("test_dynamic_sql.py"))
+        assert "sql-injection" in ids
+
+    def test_parameterised_query_not_flagged(self):
+        # query3 uses "?" so it should not appear as a finding
+        findings = get_findings("test_dynamic_sql.py")
+        sql_findings = [f for f in findings if f["rule"]["id"] == "sql-injection"]
+        # only the f-string and concatenation lines should be flagged, not the "?" one
+        assert len(sql_findings) == 2
+
+
 def test_scan_missing_file_returns_no_findings():
     """Scanning a file that doesn't exist should fail gracefully, not crash."""
     rules = load_rules()

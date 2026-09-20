@@ -122,7 +122,53 @@ class SecurityVisitor(ast.NodeVisitor):
                 if query_pattern in value and "?" not in value:
                     self._add_finding(node.lineno, "unsafe_queries")
 
+        # Dynamically constructed SQL: f-strings and string concatenation
+        self._check_fstring_sql(node)
+        self._check_concat_sql(node)
+
         self.generic_visit(node)
+
+    def _check_fstring_sql(self, node):
+        """Flag f-string SQL queries that interpolate values (injection vector)."""
+        if not isinstance(node.value, ast.JoinedStr):
+            return
+        literal_parts = []
+        has_interpolation = False
+        for value in node.value.values:
+            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                literal_parts.append(value.value)
+            elif isinstance(value, ast.FormattedValue):
+                has_interpolation = True
+        literal = "".join(literal_parts)
+        for pattern in self.rules.get("unsafe_queries", []):
+            if pattern in literal and has_interpolation:
+                self._add_finding(node.lineno, "unsafe_queries")
+                return
+
+    def _extract_concat_strings(self, node, parts):
+        """Recursively collect string constants from a + concatenation chain."""
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            parts.append(node.value)
+            return True
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+            left_is_str = self._extract_concat_strings(node.left, parts)
+            right_is_str = self._extract_concat_strings(node.right, parts)
+            return left_is_str and right_is_str
+        return False
+
+    def _check_concat_sql(self, node):
+        """Flag "..." + var style SQL construction (at least one non-constant operand)."""
+        if not (isinstance(node.value, ast.BinOp) and isinstance(node.value.op, ast.Add)):
+            return
+        parts = []
+        all_strings = self._extract_concat_strings(node.value, parts)
+        if not all_strings:
+            # At least one operand is a variable/call — that's the injection vector.
+            literal = "".join(parts)
+            for pattern in self.rules.get("unsafe_queries", []):
+                if pattern in literal:
+                    self._add_finding(node.lineno, "unsafe_queries")
+                    return
 
 
 def scan_file(filepath, rules):
