@@ -57,7 +57,8 @@ RULE_METADATA = {
 
 def load_rules():
     try:
-        with open('sentrylocal/rules.json', 'r') as file:
+        # Resolve next to this module so scans work from any working directory.
+        with open(os.path.join(os.path.dirname(__file__), 'rules.json'), 'r') as file:
             rules = json.load(file)
         return rules
     except Exception as e:
@@ -81,6 +82,9 @@ class SecurityVisitor(ast.NodeVisitor):
         self.rules = rules
         self.findings = []
         self._imported_modules = set()
+        # local name -> qualified name, so `import pickle as pk` / `from os import system`
+        # can't hide a call from the rules below.
+        self._names = {}
 
     def _code_line(self, lineno):
         if 1 <= lineno <= len(self.source_lines):
@@ -95,30 +99,29 @@ class SecurityVisitor(ast.NodeVisitor):
             "rule": rule_override or RULE_METADATA[rule_key],
         })
 
+    def _qualname(self, func):
+        """Resolve a call target through import aliases, e.g. pk.loads -> pickle.loads."""
+        if isinstance(func, ast.Name):
+            return self._names.get(func.id, func.id)
+        if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
+            return f"{self._names.get(func.value.id, func.value.id)}.{func.attr}"
+        return None
+
     def visit_Call(self, node):
-        # eval(...)
-        if isinstance(node.func, ast.Name) and node.func.id == "eval":
+        name = self._qualname(node.func)
+
+        if name == "eval":
             self._add_finding(node.lineno, "eval")
 
-        # os.system(...)
-        if (isinstance(node.func, ast.Attribute)
-                and node.func.attr == "system"
-                and isinstance(node.func.value, ast.Name)
-                and node.func.value.id == "os"):
+        if name == "os.system":
             self._add_finding(node.lineno, "os_system")
 
-        # pickle.loads(...) / pickle.load(...)
-        if (isinstance(node.func, ast.Attribute)
-                and node.func.attr in ("loads", "load")
-                and isinstance(node.func.value, ast.Name)
-                and node.func.value.id == "pickle"):
+        if name in ("pickle.loads", "pickle.load"):
             self._add_finding(node.lineno, "pickle_loads")
 
         # subprocess.run(...) / subprocess.call(...) with shell=True
-        if (isinstance(node.func, ast.Attribute)
-                and node.func.attr in ("run", "call", "Popen", "check_output", "check_call")
-                and isinstance(node.func.value, ast.Name)
-                and node.func.value.id == "subprocess"):
+        if name in ("subprocess.run", "subprocess.call", "subprocess.Popen",
+                    "subprocess.check_output", "subprocess.check_call"):
             for kw in node.keywords:
                 if (kw.arg == "shell"
                         and isinstance(kw.value, ast.Constant)
@@ -126,22 +129,22 @@ class SecurityVisitor(ast.NodeVisitor):
                     self._add_finding(node.lineno, "subprocess_shell")
                     break
 
-        # hashlib.md5(...) / hashlib.sha1(...)
-        if (isinstance(node.func, ast.Attribute)
-                and node.func.attr in ("md5", "sha1")
-                and isinstance(node.func.value, ast.Name)
-                and node.func.value.id == "hashlib"):
+        if name in ("hashlib.md5", "hashlib.sha1"):
             self._add_finding(node.lineno, "weak_hash")
 
         self.generic_visit(node)
 
     def visit_Import(self, node):
         for alias in node.names:
+            if alias.asname:
+                self._names[alias.asname] = alias.name
             self._check_insecure_import(alias.name, node.lineno)
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node):
         if node.module:
+            for alias in node.names:
+                self._names[alias.asname or alias.name] = f"{node.module}.{alias.name}"
             self._check_insecure_import(node.module, node.lineno)
         self.generic_visit(node)
 

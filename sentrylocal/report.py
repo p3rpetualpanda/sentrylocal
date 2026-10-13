@@ -1,4 +1,5 @@
 # report.py
+import html
 import json
 from datetime import datetime
 
@@ -56,19 +57,19 @@ def generate_html_report(findings):
             t = f["triage"]
             tcolor = triage_colors.get(t.get("verdict"), "#9e9e9e")
             triage_cell = (f"<span style=\"color:{tcolor}; font-weight:bold;\">"
-                           f"{t.get('verdict', '')}</span> "
+                           f"{_escape(t.get('verdict', ''))}</span> "
                            f"<span style=\"color:#888;\">({_escape(t.get('explanation', ''))})</span>")
         else:
             triage_cell = "<span style=\"color:#666;\">—</span>"
         rows.append(f"""
         <tr>
-            <td><span style="color:{color}; font-weight:bold;">{rule['severity']}</span></td>
-            <td>{rule['id']}</td>
-            <td>{cwe}</td>
-            <td>{f['file']}</td>
+            <td><span style="color:{color}; font-weight:bold;">{_escape(rule['severity'])}</span></td>
+            <td>{_escape(rule['id'])}</td>
+            <td>{_escape(cwe)}</td>
+            <td>{_escape(f['file'])}</td>
             <td>{f['line']}</td>
             <td><code>{_escape(f['code'])}</code></td>
-            <td>{rule['description']}</td>
+            <td>{_escape(rule['description'])}</td>
             <td>{triage_cell}</td>
         </tr>""")
 
@@ -171,10 +172,8 @@ def generate_sarif_report(findings):
 
 
 def _escape(text):
-    """Minimal HTML escaping for code snippets."""
-    return (text.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;"))
+    """HTML-escape any report field: file names, code and LLM text are all untrusted."""
+    return html.escape(str(text))
 
 
 def write_report(findings, output_format, output_path):

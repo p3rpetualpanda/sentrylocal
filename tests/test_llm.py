@@ -8,7 +8,7 @@ from sentrylocal.scanner import scan_file, load_rules
 
 def test_triage_finding_returns_valid_verdict():
     rules = load_rules()
-    findings = scan_file(os.path.join("tests", "fixtures", "test_vulnerable.py"), rules)
+    findings = scan_file(os.path.join(os.path.dirname(__file__), "fixtures", "test_vulnerable.py"), rules)
     assert findings, "expected at least one finding"
     result = triage_finding(findings[0])
     assert result["verdict"] in ("true_positive", "false_positive", "needs_review")

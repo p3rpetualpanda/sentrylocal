@@ -152,3 +152,26 @@ def test_sarif_output_is_valid_json():
     for result in run["results"]:
         assert result["ruleId"] in rule_ids
         assert result["locations"][0]["physicalLocation"]["region"]["startLine"] > 0
+
+class TestAliasedImports:
+    """test_aliased_imports.py — `import x as y` / `from x import y` must not evade rules."""
+
+    def test_aliases_are_resolved(self):
+        ids = rule_ids(get_findings("test_aliased_imports.py"))
+        for rule_id in ("pickle-loads", "weak-hash", "os-system-use", "subprocess-shell"):
+            assert rule_id in ids
+
+
+def test_load_rules_works_from_any_directory(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert load_rules().get("secrets")
+
+
+def test_html_report_escapes_every_field():
+    from sentrylocal.report import generate_html_report
+    finding = {"file": "<script>x</script>.py", "line": 1, "code": "eval(x)",
+               "rule": {"id": "eval-use", "severity": "HIGH", "cwe": "CWE-94",
+                        "description": "<b>d</b>"}}
+    html_out = generate_html_report([finding])
+    assert "<script>x</script>" not in html_out
+    assert "&lt;script&gt;" in html_out
