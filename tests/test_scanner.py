@@ -160,6 +160,8 @@ class TestAliasedImports:
         ids = rule_ids(get_findings("test_aliased_imports.py"))
         for rule_id in ("pickle-loads", "weak-hash", "os-system-use", "subprocess-shell"):
             assert rule_id in ids
+        assert ids.count("eval-use") == 1  # builtins.eval via an alias
+        assert ids.count("os-system-use") == 1  # `from .os import system` is a local module
 
 
 def test_load_rules_works_from_any_directory(tmp_path, monkeypatch):
@@ -172,6 +174,9 @@ def test_html_report_escapes_every_field():
     finding = {"file": "<script>x</script>.py", "line": 1, "code": "eval(x)",
                "rule": {"id": "eval-use", "severity": "HIGH", "cwe": "CWE-94",
                         "description": "<b>d</b>"}}
-    html_out = generate_html_report([finding])
-    assert "<script>x</script>" not in html_out
+    hostile = dict(finding, triage={"verdict": "<img src=x onerror=alert(1)>", "confidence": 0.5,
+                                    "explanation": "<script>steal()</script>"})
+    html_out = generate_html_report([finding, hostile])
+    for raw in ("<script>x</script>", "<b>d</b>", "<img src=x", "<script>steal()"):
+        assert raw not in html_out
     assert "&lt;script&gt;" in html_out

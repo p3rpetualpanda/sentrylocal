@@ -19,6 +19,8 @@ Every finding is mapped to a [CWE](https://cwe.mitre.org/) identifier, and repor
 
 ## Installation
 
+Requires **Python 3.10+** (the pinned test dependency, pytest 9.0.3, needs it; the scanner itself has no third-party dependencies).
+
 ```bash
 git clone https://github.com/p3rpetualpanda/sentrylocal.git
 cd sentrylocal
@@ -89,7 +91,7 @@ Together these turn a fast, deterministic scanner into a two-stage analysis: the
 SentryLocal has a pytest suite that checks detection against known vulnerable and clean code samples:
 
 ```bash
-pip install pytest
+pip install -r requirements.txt
 pytest tests/ -v
 ```
 
@@ -104,6 +106,7 @@ That said, detection is still deliberately conservative in a few ways:
 - `eval()` calls are flagged regardless of whether the input is provably harmless (e.g. `eval("1 + 2")`) — static analysis can't know intent, so any real call is treated as a risk.
 - SQL injection detection flags dynamically built queries (f-strings and string concatenation) that contain a known-risky pattern, but it still relies on pattern matching rather than full data-flow analysis.
 - Secret detection matches against a fixed list of variable names in `rules.json` (e.g. `API_KEY`, `PASSWORD`) rather than inspecting value formats.
+- Import aliases (`import pickle as pk`, `from os import system`) are resolved, but per file rather than per scope: a later `def system(): ...` or a function-local import can cause a false positive, and reassignment (`f = pickle.loads; f(x)`) isn't followed. Relative imports are treated as the project's own modules.
 
 These are documented tradeoffs, not oversights — see the Roadmap below for planned improvements.
 
@@ -131,8 +134,7 @@ sentrylocal/
 │   ├── test_scanner.py
 │   └── test_llm.py
 ├── main.py                # CLI entry point
-├── benchmark.py           # Rule-only vs rule+LLM benchmark
-└── config.yaml
+└── benchmark.py           # Rule-only vs rule+LLM benchmark
 ```
 
 ## Why this project exists

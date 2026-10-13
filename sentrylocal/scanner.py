@@ -84,6 +84,8 @@ class SecurityVisitor(ast.NodeVisitor):
         self._imported_modules = set()
         # local name -> qualified name, so `import pickle as pk` / `from os import system`
         # can't hide a call from the rules below.
+        # shortcut: one flat map per file, not scope-aware: imports leak across functions and
+        # later rebinding (def system(): ...) isn't tracked; needs a symbol table to fix.
         self._names = {}
 
     def _code_line(self, lineno):
@@ -110,7 +112,7 @@ class SecurityVisitor(ast.NodeVisitor):
     def visit_Call(self, node):
         name = self._qualname(node.func)
 
-        if name == "eval":
+        if name in ("eval", "builtins.eval"):
             self._add_finding(node.lineno, "eval")
 
         if name == "os.system":
@@ -143,7 +145,8 @@ class SecurityVisitor(ast.NodeVisitor):
 
     def visit_ImportFrom(self, node):
         if node.module:
-            for alias in node.names:
+            # Relative imports (from .os import system) are the project's own modules.
+            for alias in node.names if node.level == 0 else ():
                 self._names[alias.asname or alias.name] = f"{node.module}.{alias.name}"
             self._check_insecure_import(node.module, node.lineno)
         self.generic_visit(node)

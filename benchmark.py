@@ -1,9 +1,10 @@
 """Compare rule-only vs rule+LLM triage on the fixture set."""
+import os
 import time
 from sentrylocal.scanner import scan_directory
 from sentrylocal.llm import triage_findings
 
-FIXTURES = "tests/fixtures"
+FIXTURES = os.path.join(os.path.dirname(__file__), "tests", "fixtures")
 
 t0 = time.perf_counter()
 findings = scan_directory(FIXTURES)
