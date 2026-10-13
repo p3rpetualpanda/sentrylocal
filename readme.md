@@ -1,5 +1,7 @@
 # SentryLocal
 
+![CI](https://github.com/p3rpetualpanda/sentrylocal/actions/workflows/ci.yml/badge.svg)
+
 A local, privacy-preserving security scanner for Python code. SentryLocal scans a directory for common vulnerability patterns without sending any code to external services — everything runs on your own machine.
 
 ## What it does
